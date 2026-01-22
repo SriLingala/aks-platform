@@ -1,0 +1,9 @@
+variable "name_prefix" { type = string }
+variable "location" { type = string }
+variable "resource_group_name" { type = string }
+variable "subnet_id" { type = string }
+variable "aks_identity_id" { type = string }
+variable "kubernetes_version" { type = string }
+variable "system_node_count" { type = number }
+variable "system_vm_size" { type = string }
+variable "tags" { type = map(string) }

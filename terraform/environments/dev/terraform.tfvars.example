@@ -1,0 +1,17 @@
+project = "portfolio"
+env     = "dev"
+location = "uksouth"
+
+resource_group_name = "rg-portfolio-dev"
+tenant_id = "00000000-0000-0000-0000-000000000000"
+
+vnet_cidr       = "10.50.0.0/16"
+aks_subnet_cidr = "10.50.1.0/24"
+
+kubernetes_version = "1.29.7"
+system_node_count  = 2
+system_vm_size     = "Standard_D4s_v5"
+
+tags = {
+  owner = "sri"
+}
