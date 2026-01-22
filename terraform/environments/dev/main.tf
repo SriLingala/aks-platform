@@ -13,12 +13,12 @@ module "jumpbox" {
   resource_group_name = var.resource_group_name
 
   # put jumpbox into same subnet for simplicity (ok for portfolio)
-  subnet_id           = module.network.aks_subnet_id
+  subnet_id = module.network.aks_subnet_id
 
-  vm_size             = "Standard_B2s"
-  admin_username      = var.jumpbox_admin_username
-  ssh_public_key      = var.jumpbox_ssh_public_key
-  tags                = local.tags
+  vm_size        = "Standard_B2s"
+  admin_username = var.jumpbox_admin_username
+  ssh_public_key = var.jumpbox_ssh_public_key
+  tags           = local.tags
 }
 
 module "network" {
@@ -57,14 +57,14 @@ module "aks" {
   location            = var.location
   resource_group_name = var.resource_group_name
 
-  subnet_id           = module.network.aks_subnet_id
-  aks_identity_id     = module.identity.aks_uami_id
+  subnet_id       = module.network.aks_subnet_id
+  aks_identity_id = module.identity.aks_uami_id
 
-  kubernetes_version  = var.kubernetes_version
-  system_node_count   = var.system_node_count
-  system_vm_size      = var.system_vm_size
+  kubernetes_version = var.kubernetes_version
+  system_node_count  = var.system_node_count
+  system_vm_size     = var.system_vm_size
 
-  tags                = local.tags
+  tags = local.tags
 }
 
 resource "azurerm_role_assignment" "aks_subnet_network_contributor" {
