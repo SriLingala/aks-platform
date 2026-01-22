@@ -1,0 +1,34 @@
+name: terraform-validate
+
+on:
+  push:
+    paths:
+      - "terraform/**"
+  pull_request:
+    paths:
+      - "terraform/**"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive terraform
+
+      - name: Prepare tfvars (dev)
+        working-directory: terraform/environments/dev
+        run: cp terraform.tfvars.example terraform.tfvars
+
+      - name: Terraform init (dev)
+        working-directory: terraform/environments/dev
+        run: terraform init -backend=false
+
+      - name: Terraform validate (dev)
+        working-directory: terraform/environments/dev
+        run: terraform validate
