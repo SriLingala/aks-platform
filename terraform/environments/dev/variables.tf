@@ -7,6 +7,7 @@ variable "tenant_id" { type = string }
 
 variable "vnet_cidr" { type = string }
 variable "aks_subnet_cidr" { type = string }
+variable "bastion_subnet_cidr" { type = string }
 
 variable "kubernetes_version" { type = string }
 variable "system_node_count"  { type = number }

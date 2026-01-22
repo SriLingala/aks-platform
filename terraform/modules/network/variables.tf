@@ -3,4 +3,5 @@ variable "location" { type = string }
 variable "resource_group_name" { type = string }
 variable "vnet_cidr" { type = string }
 variable "aks_subnet_cidr" { type = string }
+variable "bastion_subnet_cidr" { type = string }
 variable "tags" { type = map(string) }
