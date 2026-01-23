@@ -28,10 +28,6 @@ jobs:
         with:
           terraform_version: latest
 
-      - name: Prepare tfvars (dev)
-        working-directory: terraform/environments/dev
-        run: cp terraform.tfvars.example terraform.tfvars
-
       - name: Terraform init (dev)
         working-directory: terraform/environments/dev
         run: terraform init -backend=false
