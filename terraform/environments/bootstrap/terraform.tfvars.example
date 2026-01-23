@@ -1,0 +1,11 @@
+project  = "portfolio"
+env      = "bootstrap"
+location = "uksouth"
+
+resource_group_name         = "rg-portfolio-bootstrap"
+storage_account_name_prefix = "portfolioboot"
+container_name              = "tfstate"
+
+tags = {
+  owner = "sri"
+}
