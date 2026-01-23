@@ -13,15 +13,15 @@ resource "random_string" "suffix" {
 }
 
 resource "azurerm_storage_account" "state" {
-  name                     = local.storage_account_name
-  resource_group_name      = azurerm_resource_group.state.name
-  location                 = var.location
-  account_tier             = "Standard"
-  account_replication_type = "LRS"
-  account_kind             = "StorageV2"
-  min_tls_version          = "TLS1_2"
+  name                      = local.storage_account_name
+  resource_group_name       = azurerm_resource_group.state.name
+  location                  = var.location
+  account_tier              = "Standard"
+  account_replication_type  = "LRS"
+  account_kind              = "StorageV2"
+  min_tls_version           = "TLS1_2"
   enable_https_traffic_only = true
-  tags                     = var.tags
+  tags                      = var.tags
 }
 
 resource "azurerm_storage_container" "state" {
