@@ -7,11 +7,11 @@ locals {
 }
 
 module "bootstrap" {
-  source                     = "../../modules/bootstrap"
-  name_prefix                = local.name_prefix
-  location                   = var.location
-  resource_group_name        = var.resource_group_name
+  source                      = "../../modules/bootstrap"
+  name_prefix                 = local.name_prefix
+  location                    = var.location
+  resource_group_name         = var.resource_group_name
   storage_account_name_prefix = var.storage_account_name_prefix
-  container_name             = var.container_name
-  tags                       = local.tags
+  container_name              = var.container_name
+  tags                        = local.tags
 }
