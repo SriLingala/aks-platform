@@ -48,6 +48,16 @@ jobs:
         working-directory: terraform/environments/bootstrap
         run: terraform apply -input=false -auto-approve
 
+      - name: Write backend config (bootstrap)
+        if: inputs.action == 'apply'
+        working-directory: terraform/environments/bootstrap
+        run: |
+          cat > backend.tf <<'EOF'
+          terraform {
+            backend "azurerm" {}
+          }
+          EOF
+
       - name: Capture bootstrap outputs
         if: inputs.action == 'apply'
         working-directory: terraform/environments/bootstrap
@@ -91,6 +101,11 @@ jobs:
         if: inputs.action == 'destroy'
         working-directory: terraform/environments/bootstrap
         run: |
+          cat > backend.tf <<'EOF'
+          terraform {
+            backend "azurerm" {}
+          }
+          EOF
           if [ -z "${{ secrets.TF_BACKEND_RESOURCE_GROUP }}" ] || \
              [ -z "${{ secrets.TF_BACKEND_STORAGE_ACCOUNT }}" ] || \
              [ -z "${{ secrets.TF_BACKEND_CONTAINER }}" ] || \
