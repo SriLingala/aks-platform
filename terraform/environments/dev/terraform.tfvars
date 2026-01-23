@@ -1,12 +1,12 @@
-project = "portfolio"
-env     = "dev"
+project  = "portfolio"
+env      = "dev"
 location = "uksouth"
 
 resource_group_name = "rg-portfolio-dev"
-tenant_id = "00000000-0000-0000-0000-000000000000"
+tenant_id           = "00000000-0000-0000-0000-000000000000"
 
-vnet_cidr       = "10.50.0.0/16"
-aks_subnet_cidr = "10.50.1.0/24"
+vnet_cidr           = "10.50.0.0/16"
+aks_subnet_cidr     = "10.50.1.0/24"
 bastion_subnet_cidr = "10.50.2.0/27"
 
 kubernetes_version = "1.29.7"
