@@ -1,20 +1,17 @@
-name: terraform-plan
+name: terraform-destroy
 
 on:
   workflow_dispatch:
-  workflow_run:
-    workflows: ["terraform-validate"]
-    types:
-      - completed
+
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
-  plan:
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'pull_request' &&
-       github.event.workflow_run.head_repository.fork == false)
+  destroy:
     runs-on: ubuntu-latest
+    environment: production
+    concurrency: terraform-destroy-dev
     env:
       TF_IN_AUTOMATION: 1
       ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
@@ -47,6 +44,6 @@ jobs:
             -backend-config="container_name=${{ secrets.TF_BACKEND_CONTAINER }}" \
             -backend-config="key=${{ secrets.TF_BACKEND_KEY }}"
 
-      - name: Terraform plan (dev)
+      - name: Terraform destroy (dev)
         working-directory: terraform/environments/dev
-        run: terraform plan -input=false -no-color
+        run: terraform destroy -input=false -auto-approve

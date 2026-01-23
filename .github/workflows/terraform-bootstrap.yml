@@ -1,0 +1,110 @@
+name: terraform-bootstrap
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Action to run (apply or destroy)"
+        required: true
+        default: apply
+        type: choice
+        options:
+          - apply
+          - destroy
+
+permissions:
+  contents: read
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    environment: bootstrap
+    concurrency: terraform-bootstrap
+    env:
+      TF_IN_AUTOMATION: 1
+      ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+      ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: latest
+
+      - name: Prepare tfvars (bootstrap)
+        if: inputs.action == 'apply'
+        working-directory: terraform/environments/bootstrap
+        run: cp terraform.tfvars.example terraform.tfvars
+
+      - name: Terraform init (bootstrap, local)
+        if: inputs.action == 'apply'
+        working-directory: terraform/environments/bootstrap
+        run: terraform init -backend=false
+
+      - name: Terraform apply (bootstrap)
+        if: inputs.action == 'apply'
+        working-directory: terraform/environments/bootstrap
+        run: terraform apply -input=false -auto-approve
+
+      - name: Capture bootstrap outputs
+        if: inputs.action == 'apply'
+        working-directory: terraform/environments/bootstrap
+        run: terraform output -json > bootstrap-outputs.json
+
+      - name: Migrate bootstrap state to remote
+        if: inputs.action == 'apply'
+        working-directory: terraform/environments/bootstrap
+        run: |
+          RG=$(terraform output -raw resource_group_name)
+          SA=$(terraform output -raw storage_account_name)
+          CONTAINER=$(terraform output -raw container_name)
+          terraform init -input=false \
+            -backend-config="resource_group_name=${RG}" \
+            -backend-config="storage_account_name=${SA}" \
+            -backend-config="container_name=${CONTAINER}" \
+            -backend-config="key=bootstrap.tfstate" \
+            -migrate-state -force-copy
+
+      - name: Upload bootstrap outputs
+        if: inputs.action == 'apply'
+        uses: actions/upload-artifact@v4
+        with:
+          name: bootstrap-outputs
+          path: terraform/environments/bootstrap/bootstrap-outputs.json
+
+      - name: Show backend values
+        if: inputs.action == 'apply'
+        working-directory: terraform/environments/bootstrap
+        run: |
+          RG=$(terraform output -raw resource_group_name)
+          SA=$(terraform output -raw storage_account_name)
+          CONTAINER=$(terraform output -raw container_name)
+          echo "Backend values:" >> $GITHUB_STEP_SUMMARY
+          echo "- TF_BACKEND_RESOURCE_GROUP=$RG" >> $GITHUB_STEP_SUMMARY
+          echo "- TF_BACKEND_STORAGE_ACCOUNT=$SA" >> $GITHUB_STEP_SUMMARY
+          echo "- TF_BACKEND_CONTAINER=$CONTAINER" >> $GITHUB_STEP_SUMMARY
+          echo "- TF_BACKEND_KEY=dev.tfstate" >> $GITHUB_STEP_SUMMARY
+
+      - name: Terraform init (bootstrap, remote)
+        if: inputs.action == 'destroy'
+        working-directory: terraform/environments/bootstrap
+        run: |
+          if [ -z "${{ secrets.TF_BACKEND_RESOURCE_GROUP }}" ] || \
+             [ -z "${{ secrets.TF_BACKEND_STORAGE_ACCOUNT }}" ] || \
+             [ -z "${{ secrets.TF_BACKEND_CONTAINER }}" ] || \
+             [ -z "${{ secrets.TF_BACKEND_KEY }}" ]; then
+            echo "Missing backend secrets. Set TF_BACKEND_RESOURCE_GROUP, TF_BACKEND_STORAGE_ACCOUNT, TF_BACKEND_CONTAINER, TF_BACKEND_KEY." >&2
+            exit 1
+          fi
+          terraform init -input=false \
+            -backend-config="resource_group_name=${{ secrets.TF_BACKEND_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ secrets.TF_BACKEND_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ secrets.TF_BACKEND_CONTAINER }}" \
+            -backend-config="key=bootstrap.tfstate"
+
+      - name: Terraform destroy (bootstrap)
+        if: inputs.action == 'destroy'
+        working-directory: terraform/environments/bootstrap
+        run: terraform destroy -input=false -auto-approve
