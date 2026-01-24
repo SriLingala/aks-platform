@@ -11,7 +11,8 @@ bastion_subnet_cidr = "10.50.2.0/27"
 
 kubernetes_version = "1.34.1"
 system_node_count  = 2
-system_vm_size     = "Standard_D4s_v5"
+system_vm_size     = "Standard_D2s_v3"
+jumpbox_vm_size    = "Standard_D2s_v3"
 jumpbox_vm_size    = "Standard_D2s_v5"
 
 jumpbox_admin_username = "azureuser"
