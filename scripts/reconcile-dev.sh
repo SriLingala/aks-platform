@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+export MSYS_NO_PATHCONV=1
 
 TF_DIR="terraform/environments/dev"
 TFVARS="${TF_DIR}/terraform.tfvars"
@@ -11,16 +12,6 @@ if [[ ! -f "${TFVARS}" ]]; then
     echo "Missing ${TFVARS} and terraform.tfvars.example." >&2
     exit 1
   fi
-fi
-
-if ! command -v az >/dev/null 2>&1; then
-  echo "Azure CLI is required for reconcile step." >&2
-  exit 1
-fi
-
-if ! az account show >/dev/null 2>&1; then
-  echo "Azure CLI not logged in. Run az login or use azure/login in CI." >&2
-  exit 1
 fi
 
 get_var() {
@@ -50,10 +41,10 @@ import_if_exists() {
     return
   fi
 
-  if az resource show --ids "${id}" >/dev/null 2>&1; then
-    terraform -chdir="${TF_DIR}" import "${address}" "${id}"
+  if terraform -chdir="${TF_DIR}" import "${address}" "${id}"; then
+    echo "Imported ${address}"
   else
-    echo "Resource not found, skipping import: ${id}"
+    echo "Import skipped or failed for ${address} (resource may not exist): ${id}" >&2
   fi
 }
 

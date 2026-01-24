@@ -7,6 +7,7 @@ locals {
 }
 
 module "jumpbox" {
+  count = var.enable_jumpbox ? 1 : 0
   source              = "../../modules/jumpbox"
   name_prefix         = local.name_prefix
   location            = var.location

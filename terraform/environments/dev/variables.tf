@@ -18,6 +18,11 @@ variable "tags" {
   default = {}
 }
 
+variable "enable_jumpbox" {
+  type    = bool
+  default = true
+}
+
 variable "jumpbox_admin_username" { type = string }
 variable "jumpbox_ssh_public_key" { type = string }
 variable "jumpbox_vm_size" { type = string }
