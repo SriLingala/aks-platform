@@ -1,6 +1,6 @@
 project  = "portfolio"
 env      = "dev"
-location = "uksouth"
+location = "eastus"
 
 resource_group_name = "rg-portfolio-dev"
 tenant_id           = "b58e8c48-dd94-4e31-9685-e1c0800dee58"
