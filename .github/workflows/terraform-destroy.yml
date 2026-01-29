@@ -35,7 +35,32 @@ jobs:
             exit 1
           fi
 
+      - uses: azure/login@v2
+        with:
+          creds: '{"clientId":"${{ secrets.ARM_CLIENT_ID }}","clientSecret":"${{ secrets.ARM_CLIENT_SECRET }}","subscriptionId":"${{ secrets.ARM_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.ARM_TENANT_ID }}"}'
+
+      - name: Check backend exists
+        id: backend
+        run: |
+          if [ "$(az group exists -n "${{ secrets.TF_BACKEND_RESOURCE_GROUP }}")" != "true" ]; then
+            echo "Backend resource group not found; skipping destroy."
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if ! az storage account show \
+              --resource-group "${{ secrets.TF_BACKEND_RESOURCE_GROUP }}" \
+              --name "${{ secrets.TF_BACKEND_STORAGE_ACCOUNT }}" \
+              >/dev/null 2>&1; then
+            echo "Backend storage account not found; skipping destroy."
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "exists=true" >> "$GITHUB_OUTPUT"
+
       - name: Terraform init (dev)
+        if: steps.backend.outputs.exists == 'true'
         working-directory: terraform/environments/dev
         run: |
           terraform init -input=false \
@@ -45,5 +70,6 @@ jobs:
             -backend-config="key=${{ secrets.TF_BACKEND_KEY }}"
 
       - name: Terraform destroy (dev)
+        if: steps.backend.outputs.exists == 'true'
         working-directory: terraform/environments/dev
         run: terraform destroy -input=false -auto-approve

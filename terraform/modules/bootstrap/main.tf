@@ -20,7 +20,10 @@ resource "azurerm_storage_account" "state" {
   account_replication_type  = "LRS"
   account_kind              = "StorageV2"
   min_tls_version           = "TLS1_2"
-  enable_https_traffic_only = true
+  https_traffic_only_enabled = true
+  allow_blob_public_access   = false
+  public_network_access_enabled = var.public_network_access_enabled
+  shared_access_key_enabled     = var.shared_access_key_enabled
   tags                      = var.tags
 }
 

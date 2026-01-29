@@ -16,6 +16,16 @@ variable "container_name" {
   default = "tfstate"
 }
 
+variable "public_network_access_enabled" {
+  type    = bool
+  default = true
+}
+
+variable "shared_access_key_enabled" {
+  type    = bool
+  default = true
+}
+
 variable "tags" {
   type    = map(string)
   default = {}
