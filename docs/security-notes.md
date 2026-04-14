@@ -122,3 +122,18 @@ Minimum additional steps before production:
 4. Pin all module versions — no floating `latest`
 5. Enable diagnostic settings on AKS → Log Analytics
 6. Set Falco `falcosidekick.config.azure.workspaceId` from Key Vault
+
+---
+
+## Pre-merge Security Checklist
+
+Every PR that touches `terraform/` or `platform/` must pass the automated security gate:
+
+- [ ] tfsec — zero HIGH or CRITICAL findings
+- [ ] Checkov — zero failed checks (skipped checks must be justified in code comments)
+- [ ] Falco lint — all YAML files valid, required keys present
+- [ ] No secrets or credentials committed (checked by `.gitignore` and pre-commit hooks)
+- [ ] Terraform variable defaults remain secure (`public_network_access_enabled = false`, `local_account_disabled = true`)
+
+Results are posted automatically as a PR comment by the `security-pr-scan` workflow.
+See [`.github/workflows/security-pr-scan.yml`](../.github/workflows/security-pr-scan.yml).
