@@ -35,3 +35,71 @@ jobs:
       - name: Terraform validate (dev)
         working-directory: terraform/environments/dev
         run: terraform validate
+
+  security-scan:
+    runs-on: ubuntu-latest
+    name: Security scanning (tfsec + Checkov)
+    needs: validate
+    steps:
+      - uses: actions/checkout@v4
+
+      # tfsec — static analysis for Terraform misconfigurations
+      - name: tfsec
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          working_directory: terraform
+          soft_fail: false
+          format: sarif
+          additional_args: >
+            --minimum-severity HIGH
+            --exclude-downloaded-modules
+
+      # Upload tfsec results to GitHub Security tab
+      - name: Upload tfsec SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: results.sarif
+          category: tfsec
+
+      # Checkov — broader IaC scanning (Terraform + Kubernetes manifests)
+      - name: Checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: .
+          framework: terraform,kubernetes
+          output_format: sarif
+          output_file_path: checkov-results.sarif
+          soft_fail: false
+          skip_check: >-
+            CKV_AZURE_141,CKV2_AZURE_2
+          # CKV_AZURE_141: AKS AAD admin group — optional for portfolio, required in prod
+          # CKV2_AZURE_2: AKS auth range — handled by private cluster setup
+
+      # Upload Checkov results to GitHub Security tab
+      - name: Upload Checkov SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: checkov-results.sarif
+          category: checkov
+
+  manifest-lint:
+    runs-on: ubuntu-latest
+    name: Kubernetes manifest validation (kubeconform)
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install kubeconform
+        run: |
+          curl -sLo kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz
+          tar xf kubeconform.tar.gz
+          chmod +x kubeconform
+          sudo mv kubeconform /usr/local/bin/
+
+      - name: Validate Kubernetes manifests
+        run: |
+          find platform/manifests -name '*.yaml' | xargs kubeconform \
+            -strict \
+            -ignore-missing-schemas \
+            -summary
