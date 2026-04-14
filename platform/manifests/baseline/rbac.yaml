@@ -1,0 +1,117 @@
+# Kubernetes RBAC — principle of least privilege
+# Pattern: ClusterRoles define permissions, RoleBindings scope them to namespaces.
+# Never use ClusterRoleBindings unless the role genuinely needs cluster-wide access.
+
+---
+# Platform read-only — view resources across the cluster (for dashboards, monitoring)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: platform-viewer
+  labels:
+    managed-by: platform-team
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "endpoints", "namespaces", "nodes", "events"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets", "daemonsets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies", "ingresses"]
+    verbs: ["get", "list", "watch"]
+
+---
+# App developer — deploy and debug within their own namespace only
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: app-developer
+  labels:
+    managed-by: platform-team
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "pods/exec", "services", "configmaps", "events"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  # No secrets access — secrets come via Key Vault CSI driver
+  # No RBAC resources — teams cannot grant themselves additional permissions
+
+---
+# App namespace admin — team lead permissions within one namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: namespace-admin
+  labels:
+    managed-by: platform-team
+rules:
+  - apiGroups: [""]
+    resources: ["*"]
+    verbs: ["*"]
+  - apiGroups: ["apps"]
+    resources: ["*"]
+    verbs: ["*"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["*"]
+    verbs: ["*"]
+  # Explicitly no cluster-scoped resources
+  # Explicitly no secrets — managed via Key Vault CSI
+
+---
+# Bind platform-viewer to monitoring service account (cluster-wide read for Prometheus)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus-platform-viewer
+  labels:
+    managed-by: platform-team
+subjects:
+  - kind: ServiceAccount
+    name: kube-prometheus-stack-prometheus
+    namespace: monitoring
+roleRef:
+  kind: ClusterRole
+  name: platform-viewer
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Bind app-developer to team-a namespace only (not cluster-wide)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: team-a-developers
+  namespace: app-team-a
+  labels:
+    managed-by: platform-team
+subjects:
+  - kind: Group
+    name: team-a-developers   # Maps to AAD group object ID via azure-rbac
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: app-developer
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Bind namespace-admin to team-a lead (namespace-scoped only)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: team-a-namespace-admin
+  namespace: app-team-a
+  labels:
+    managed-by: platform-team
+subjects:
+  - kind: Group
+    name: team-a-leads
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: namespace-admin
+  apiGroup: rbac.authorization.k8s.io
