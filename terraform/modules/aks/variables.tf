@@ -6,19 +6,28 @@ variable "aks_identity_id" { type = string }
 variable "kubernetes_version" { type = string }
 variable "system_node_count" { type = number }
 variable "system_vm_size" { type = string }
+
+variable "log_analytics_workspace_id" {
+  description = "Log Analytics workspace ID for Microsoft Defender for Containers"
+  type        = string
+}
+
 variable "public_network_access_enabled" {
   type    = bool
-  default = true
+  default = false
+  description = "Disable public network access to AKS API server (recommended: false for production)"
 }
 
 variable "local_account_disabled" {
   type    = bool
-  default = false
+  default = true
+  description = "Disable local Kubernetes accounts — enforce AAD-only access"
 }
 
 variable "azure_policy_enabled" {
   type    = bool
   default = true
+  description = "Enable Azure Policy add-on for compliance enforcement"
 }
 
 variable "enable_aad_rbac" {
@@ -36,8 +45,9 @@ variable "aad_admin_group_object_ids" {
 }
 
 variable "api_server_authorized_ip_ranges" {
-  type    = list(string)
-  default = []
+  type        = list(string)
+  default     = []
+  description = "IP ranges allowed to reach the AKS API server. Leave empty for private cluster with no additional restrictions."
 }
 
 variable "outbound_type" {
