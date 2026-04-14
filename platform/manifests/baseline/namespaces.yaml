@@ -1,0 +1,85 @@
+# Namespace definitions with Pod Security Standards (PSS) enforcement
+# PSS levels: privileged > baseline > restricted
+# Labels control: warn, audit, enforce — set independently per namespace.
+# Reference: https://kubernetes.io/docs/concepts/security/pod-security-standards/
+
+---
+# Platform system namespace — ingress, cert-manager, external-dns
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ingress-nginx
+  labels:
+    # Baseline: blocks known privilege escalations (hostPID, hostNetwork, privileged containers)
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/audit: restricted
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cert-manager
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/audit: restricted
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: external-dns
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/audit: restricted
+
+---
+# Monitoring namespace — Prometheus, Grafana, Alertmanager
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/audit: restricted
+    kubernetes.io/metadata.name: monitoring
+
+---
+# Application team namespace — restricted (no privilege escalation, no root)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: app-team-a
+  labels:
+    # Restricted: strongest PSS level — no root, no privilege escalation, read-only root FS
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/audit: restricted
+    kubernetes.io/metadata.name: app-team-a
+    team: team-a
+    environment: production
+
+---
+# Workload Identity demo namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: workload-identity-demo
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/audit: restricted
+
+---
+# CSI Secrets Store — baseline because it needs host volume access
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kube-secrets-store-csi-driver
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/warn: privileged
+    pod-security.kubernetes.io/audit: privileged
