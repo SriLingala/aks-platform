@@ -13,20 +13,20 @@ variable "log_analytics_workspace_id" {
 }
 
 variable "public_network_access_enabled" {
-  type    = bool
-  default = false
+  type        = bool
+  default     = false
   description = "Disable public network access to AKS API server (recommended: false for production)"
 }
 
 variable "local_account_disabled" {
-  type    = bool
-  default = true
+  type        = bool
+  default     = true
   description = "Disable local Kubernetes accounts — enforce AAD-only access"
 }
 
 variable "azure_policy_enabled" {
-  type    = bool
-  default = true
+  type        = bool
+  default     = true
   description = "Enable Azure Policy add-on for compliance enforcement"
 }
 

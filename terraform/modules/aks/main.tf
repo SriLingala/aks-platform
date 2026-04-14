@@ -50,9 +50,9 @@ resource "azurerm_kubernetes_cluster" "aks" {
   }
 
   network_profile {
-    network_plugin = "azure"
-    network_policy = "azure"
-    outbound_type  = var.outbound_type
+    network_plugin    = "azure"
+    network_policy    = "azure"
+    outbound_type     = var.outbound_type
     load_balancer_sku = var.load_balancer_sku
   }
 
