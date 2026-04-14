@@ -1,0 +1,347 @@
+name: Security PR Scan
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "terraform/**"
+      - "platform/**"
+      - ".github/workflows/**"
+
+# Limit to one run per PR — cancel in-progress on new push
+concurrency:
+  group: security-scan-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write      # needed to post PR comment
+  security-events: write    # needed to upload SARIF to GitHub Security tab
+
+jobs:
+  # ── Job 1: tfsec ────────────────────────────────────────────────────────────
+  tfsec:
+    name: tfsec (Terraform)
+    runs-on: ubuntu-latest
+    outputs:
+      outcome: ${{ steps.scan.outcome }}
+      summary: ${{ steps.summary.outputs.text }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run tfsec
+        id: scan
+        uses: aquasecurity/tfsec-action@v1.0.3
+        continue-on-error: true
+        with:
+          working_directory: terraform
+          soft_fail: true
+          format: json
+          additional_args: >
+            --minimum-severity HIGH
+            --out tfsec-results.json
+
+      - name: Parse tfsec results
+        id: summary
+        if: always()
+        run: |
+          if [ -f tfsec-results.json ]; then
+            CRITICAL=$(jq '[.results[] | select(.severity=="CRITICAL")] | length' tfsec-results.json 2>/dev/null || echo 0)
+            HIGH=$(jq '[.results[] | select(.severity=="HIGH")] | length' tfsec-results.json 2>/dev/null || echo 0)
+            MEDIUM=$(jq '[.results[] | select(.severity=="MEDIUM")] | length' tfsec-results.json 2>/dev/null || echo 0)
+            LOW=$(jq '[.results[] | select(.severity=="LOW")] | length' tfsec-results.json 2>/dev/null || echo 0)
+            TOTAL=$(jq '.results | length' tfsec-results.json 2>/dev/null || echo 0)
+
+            if [ "$CRITICAL" -gt 0 ] || [ "$HIGH" -gt 0 ]; then
+              STATUS="❌ FAILED"
+            else
+              STATUS="✅ PASSED"
+            fi
+
+            TEXT="**tfsec** — ${STATUS}
+          | Severity | Count |
+          |----------|-------|
+          | 🔴 Critical | ${CRITICAL} |
+          | 🟠 High | ${HIGH} |
+          | 🟡 Medium | ${MEDIUM} |
+          | 🟢 Low | ${LOW} |
+          | **Total** | **${TOTAL}** |"
+          else
+            TEXT="**tfsec** — ✅ No issues found"
+          fi
+
+          echo "text<<EOF" >> $GITHUB_OUTPUT
+          echo "$TEXT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Upload tfsec SARIF
+        if: always()
+        uses: aquasecurity/tfsec-action@v1.0.3
+        continue-on-error: true
+        with:
+          working_directory: terraform
+          soft_fail: true
+          format: sarif
+          additional_args: --minimum-severity HIGH --out tfsec-results.sarif
+
+      - name: Upload SARIF to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        continue-on-error: true
+        with:
+          sarif_file: tfsec-results.sarif
+          category: tfsec
+
+  # ── Job 2: Checkov ──────────────────────────────────────────────────────────
+  checkov:
+    name: Checkov (Terraform + Kubernetes)
+    runs-on: ubuntu-latest
+    outputs:
+      outcome: ${{ steps.scan.outcome }}
+      summary: ${{ steps.summary.outputs.text }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Checkov
+        id: scan
+        uses: bridgecrewio/checkov-action@v12
+        continue-on-error: true
+        with:
+          directory: .
+          framework: terraform,kubernetes
+          output_format: json
+          output_file_path: checkov-results.json
+          soft_fail: true
+          skip_check: >-
+            CKV_AZURE_141,CKV2_AZURE_2
+          # CKV_AZURE_141: AKS AAD admin group — optional for portfolio
+          # CKV2_AZURE_2:  AKS auth range — handled by private cluster
+
+      - name: Parse Checkov results
+        id: summary
+        if: always()
+        run: |
+          if [ -f checkov-results.json ]; then
+            PASSED=$(jq '[.[] | .summary.passed] | add // 0' checkov-results.json 2>/dev/null || echo 0)
+            FAILED=$(jq '[.[] | .summary.failed] | add // 0' checkov-results.json 2>/dev/null || echo 0)
+            SKIPPED=$(jq '[.[] | .summary.skipped] | add // 0' checkov-results.json 2>/dev/null || echo 0)
+
+            if [ "$FAILED" -gt 0 ]; then
+              STATUS="❌ FAILED"
+            else
+              STATUS="✅ PASSED"
+            fi
+
+            TEXT="**Checkov** — ${STATUS}
+          | Result | Count |
+          |--------|-------|
+          | ✅ Passed | ${PASSED} |
+          | ❌ Failed | ${FAILED} |
+          | ⏭️ Skipped | ${SKIPPED} |"
+          else
+            TEXT="**Checkov** — ✅ No issues found"
+          fi
+
+          echo "text<<EOF" >> $GITHUB_OUTPUT
+          echo "$TEXT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Upload Checkov SARIF
+        if: always()
+        uses: bridgecrewio/checkov-action@v12
+        continue-on-error: true
+        with:
+          directory: .
+          framework: terraform,kubernetes
+          output_format: sarif
+          output_file_path: checkov-results.sarif
+          soft_fail: true
+          skip_check: CKV_AZURE_141,CKV2_AZURE_2
+
+      - name: Upload SARIF to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        continue-on-error: true
+        with:
+          sarif_file: checkov-results.sarif
+          category: checkov
+
+  # ── Job 3: Falco rule linting ───────────────────────────────────────────────
+  falco-lint:
+    name: Falco rule lint
+    runs-on: ubuntu-latest
+    outputs:
+      outcome: ${{ steps.lint.outcome }}
+      summary: ${{ steps.summary.outputs.text }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install falcoctl
+        run: |
+          curl -sLo falcoctl.tar.gz \
+            https://github.com/falcosecurity/falcoctl/releases/latest/download/falcoctl_linux_amd64.tar.gz
+          tar xf falcoctl.tar.gz
+          chmod +x falcoctl
+          sudo mv falcoctl /usr/local/bin/
+
+      - name: Lint Falco rules files
+        id: lint
+        continue-on-error: true
+        run: |
+          ERRORS=""
+          EXIT_CODE=0
+
+          # Find any custom Falco rules files in the repo
+          RULES_FILES=$(find . -name "*falco*rules*.yaml" -o -name "*falco*rules*.yml" 2>/dev/null | grep -v ".github")
+
+          if [ -z "$RULES_FILES" ]; then
+            echo "No custom Falco rules files found — validating Falco values.yaml structure"
+            # Validate the Helm values file is valid YAML
+            python3 -c "
+          import yaml, sys
+          try:
+              with open('platform/helm/falco/values.yaml') as f:
+                  yaml.safe_load(f)
+              print('values.yaml: valid YAML')
+          except Exception as e:
+              print(f'values.yaml: INVALID — {e}')
+              sys.exit(1)
+          " 2>&1
+            LINT_RESULT=$?
+          else
+            echo "Found custom rules: $RULES_FILES"
+            for f in $RULES_FILES; do
+              echo "Linting: $f"
+              falcoctl artifact lint --type rulesfile "$f" 2>&1 || EXIT_CODE=1
+            done
+          fi
+
+          # Also validate all platform manifests are valid YAML
+          echo "Validating all platform YAML files..."
+          python3 -c "
+          import yaml, os, sys
+          errors = []
+          for root, dirs, files in os.walk('platform'):
+              for f in files:
+                  if f.endswith(('.yaml', '.yml')):
+                      path = os.path.join(root, f)
+                      try:
+                          list(yaml.safe_load_all(open(path)))
+                      except Exception as e:
+                          errors.append(f'{path}: {e}')
+          if errors:
+              print('YAML validation errors:')
+              for e in errors:
+                  print(f'  {e}')
+              sys.exit(1)
+          else:
+              print(f'All platform YAML files are valid')
+          " 2>&1
+          YAML_RESULT=$?
+
+          if [ $EXIT_CODE -ne 0 ] || [ $YAML_RESULT -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Build summary
+        id: summary
+        if: always()
+        run: |
+          if [ "${{ steps.lint.outcome }}" = "success" ]; then
+            TEXT="**Falco rule lint** — ✅ PASSED
+          All Falco configuration and platform YAML files are valid"
+          else
+            TEXT="**Falco rule lint** — ❌ FAILED
+          One or more Falco rules or YAML files failed validation — check the job logs"
+          fi
+
+          echo "text<<EOF" >> $GITHUB_OUTPUT
+          echo "$TEXT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+  # ── Job 4: Post PR comment ──────────────────────────────────────────────────
+  pr-comment:
+    name: Post security summary
+    runs-on: ubuntu-latest
+    needs: [tfsec, checkov, falco-lint]
+    if: always() && github.event_name == 'pull_request'
+
+    steps:
+      - name: Post or update PR comment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const tfsecOutcome    = "${{ needs.tfsec.outputs.outcome }}";
+            const checkovOutcome  = "${{ needs.checkov.outputs.outcome }}";
+            const falcoOutcome    = "${{ needs.falco-lint.outputs.outcome }}";
+
+            const tfsecSummary   = `${{ needs.tfsec.outputs.summary }}`;
+            const checkovSummary = `${{ needs.checkov.outputs.summary }}`;
+            const falcoSummary   = `${{ needs.falco-lint.outputs.summary }}`;
+
+            const allPassed = (
+              tfsecOutcome   !== "failure" &&
+              checkovOutcome !== "failure" &&
+              falcoOutcome   !== "failure"
+            );
+
+            const overallStatus = allPassed
+              ? "✅ All security checks passed"
+              : "❌ One or more security checks failed — review findings below";
+
+            const runUrl = `https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
+
+            const body = [
+              "<!-- security-scan-comment -->",
+              "## 🔐 Security Scan Results",
+              "",
+              `**${overallStatus}**`,
+              "",
+              "---",
+              "",
+              tfsecSummary,
+              "",
+              "---",
+              "",
+              checkovSummary,
+              "",
+              "---",
+              "",
+              falcoSummary,
+              "",
+              "---",
+              "",
+              `> Scanned commit \`${{ github.event.pull_request.head.sha }}\` — [View full run](${runUrl})`,
+              "> Results also uploaded to the [Security tab](https://github.com/${{ github.repository }}/security/code-scanning).",
+            ].join("\n");
+
+            const marker = "<!-- security-scan-comment -->";
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find(c => c.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+              console.log("Updated existing security comment");
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+              console.log("Created new security comment");
+            }
