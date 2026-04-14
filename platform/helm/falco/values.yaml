@@ -1,0 +1,60 @@
+# Falco — runtime security and threat detection for Kubernetes
+# Detects: unexpected process execution, privilege escalation, container escapes,
+#          suspicious network connections, sensitive file access at runtime.
+# Reference: https://falco.org/docs/
+
+driver:
+  kind: modern_ebpf    # eBPF-based driver — no kernel module required, works on AzureLinux
+
+falco:
+  rules_file:
+    - /etc/falco/falco_rules.yaml
+    - /etc/falco/falco_rules.local.yaml
+    - /etc/falco/k8s_audit_rules.yaml
+    - /etc/falco/rules.d
+
+  # Send alerts to stdout for collection by log pipeline
+  json_output: true
+  log_level: info
+
+  # Alert on these severity levels and above
+  priority: WARNING
+
+  syscall_event_drops:
+    actions:
+      - log
+      - alert
+    rate: 0.03333
+    max_burst: 10
+
+falcosidekick:
+  enabled: true
+  # Forward Falco alerts to Azure Monitor / Log Analytics
+  config:
+    azure:
+      workspaceId: ""     # Set via values override in each environment
+      sharedKey: ""       # Set from Key Vault secret in production
+
+tolerations:
+  - key: CriticalAddonsOnly
+    operator: Exists
+  - effect: NoSchedule
+    key: node-role.kubernetes.io/master
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+
+podSecurityContext:
+  runAsNonRoot: false    # Falco needs root to attach eBPF probes
+  seccompProfile:
+    type: RuntimeDefault
+
+# Deploy as DaemonSet — runs on every node to capture syscall events
+daemonset:
+  updateStrategy:
+    type: RollingUpdate
