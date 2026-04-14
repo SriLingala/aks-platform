@@ -227,7 +227,3 @@ An Azure DevOps pipeline (`pipelines/azure-devops/azure-pipelines.yml`) is also 
 - **Secrets**: Azure Key Vault + CSI Secrets Store
 - **Identity**: Azure AD, Workload Identity, Managed Identity
 - **Scripting**: Bash
-
-## License
-
-[MIT](LICENSE)
