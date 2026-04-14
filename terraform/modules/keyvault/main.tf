@@ -24,16 +24,16 @@ locals {
 }
 
 resource "azurerm_key_vault" "kv" {
-  name                       = local.keyvault_name
-  location                   = var.location
-  resource_group_name        = var.resource_group_name
-  tenant_id                  = var.tenant_id
-  sku_name                   = "standard"
-  purge_protection_enabled   = var.purge_protection_enabled
-  soft_delete_retention_days = var.soft_delete_retention_days
-  enable_rbac_authorization  = true
+  name                          = local.keyvault_name
+  location                      = var.location
+  resource_group_name           = var.resource_group_name
+  tenant_id                     = var.tenant_id
+  sku_name                      = "standard"
+  purge_protection_enabled      = var.purge_protection_enabled
+  soft_delete_retention_days    = var.soft_delete_retention_days
+  enable_rbac_authorization     = true
   public_network_access_enabled = var.public_network_access_enabled
-  tags                       = var.tags
+  tags                          = var.tags
 
   dynamic "network_acls" {
     for_each = var.enable_network_acls ? [1] : []

@@ -13,12 +13,12 @@ resource "azurerm_network_interface" "nic" {
 }
 
 resource "azurerm_linux_virtual_machine" "vm" {
-  name                  = "${var.name_prefix}-jumpbox"
-  location              = var.location
-  resource_group_name   = var.resource_group_name
-  size                  = var.vm_size
-  admin_username        = var.admin_username
-  network_interface_ids = [azurerm_network_interface.nic.id]
+  name                            = "${var.name_prefix}-jumpbox"
+  location                        = var.location
+  resource_group_name             = var.resource_group_name
+  size                            = var.vm_size
+  admin_username                  = var.admin_username
+  network_interface_ids           = [azurerm_network_interface.nic.id]
   disable_password_authentication = true
 
   admin_ssh_key {

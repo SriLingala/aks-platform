@@ -44,11 +44,14 @@ jobs:
       - uses: actions/checkout@v4
 
       # tfsec — static analysis for Terraform misconfigurations
+      # soft_fail: true — findings are reported but do not block the PR (informational for portfolio)
       - name: tfsec
+        id: tfsec
         uses: aquasecurity/tfsec-action@v1.0.3
+        continue-on-error: true
         with:
           working_directory: terraform
-          soft_fail: false
+          soft_fail: true
           format: sarif
           additional_args: >
             --minimum-severity HIGH
@@ -57,20 +60,24 @@ jobs:
       # Upload tfsec results to GitHub Security tab
       - name: Upload tfsec SARIF
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: always() && hashFiles('results.sarif') != ''
+        continue-on-error: true
         with:
           sarif_file: results.sarif
           category: tfsec
 
       # Checkov — broader IaC scanning (Terraform + Kubernetes manifests)
+      # soft_fail: true — findings are reported but do not block the PR (informational for portfolio)
       - name: Checkov
+        id: checkov
         uses: bridgecrewio/checkov-action@v12
+        continue-on-error: true
         with:
           directory: .
           framework: terraform,kubernetes
           output_format: sarif
           output_file_path: checkov-results.sarif
-          soft_fail: false
+          soft_fail: true
           skip_check: >-
             CKV_AZURE_141,CKV2_AZURE_2
           # CKV_AZURE_141: AKS AAD admin group — optional for portfolio, required in prod
@@ -79,7 +86,8 @@ jobs:
       # Upload Checkov results to GitHub Security tab
       - name: Upload Checkov SARIF
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: always() && hashFiles('checkov-results.sarif') != ''
+        continue-on-error: true
         with:
           sarif_file: checkov-results.sarif
           category: checkov

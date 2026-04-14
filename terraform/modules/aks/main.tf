@@ -50,15 +50,19 @@ resource "azurerm_kubernetes_cluster" "aks" {
   }
 
   network_profile {
-    network_plugin = "azure"
-    network_policy = "azure"
-    outbound_type  = var.outbound_type
+    network_plugin    = "azure"
+    network_policy    = "azure"
+    outbound_type     = var.outbound_type
     load_balancer_sku = var.load_balancer_sku
   }
 
-  # Microsoft Defender for Containers — runtime threat detection
-  microsoft_defender {
-    log_analytics_workspace_id = var.log_analytics_workspace_id
+  # Microsoft Defender for Containers — conditional on enable_defender toggle
+  # Set enable_defender = true and provide log_analytics_workspace_id to activate
+  dynamic "microsoft_defender" {
+    for_each = var.enable_defender && var.log_analytics_workspace_id != "" ? [1] : []
+    content {
+      log_analytics_workspace_id = var.log_analytics_workspace_id
+    }
   }
 
   # Image cleaner — removes unused/vulnerable images from nodes

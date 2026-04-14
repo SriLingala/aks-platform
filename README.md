@@ -9,7 +9,7 @@
 
 ## Overview
 
-This repository provisions a **private, security-hardened AKS cluster** on Azure with a full platform layer — networking, identity, secrets management, ingress, TLS, monitoring, and DNS — using reusable Terraform modules and Helm charts. It is designed as a reference blueprint for enterprise Kubernetes platforms.
+This repository provisions a **private, security-hardened AKS cluster** on Azure with a full platform layer — networking, identity, secrets management, traffic routing, TLS, monitoring, and DNS — using reusable Terraform modules and Helm charts. It is designed as a reference blueprint for enterprise Kubernetes platforms.
 
 ## Architecture
 
@@ -26,8 +26,8 @@ This repository provisions a **private, security-hardened AKS cluster** on Azure
 │  ┌──────────────────────────────────────────────────┐    │
 │  │        Private AKS Cluster                        │    │
 │  │  ┌──────────┐ ┌──────────┐ ┌──────────────────┐  │    │
-│  │  │Ingress   │ │Cert      │ │Kube Prometheus   │  │    │
-│  │  │NGINX     │ │Manager   │ │Stack (Monitoring)│  │    │
+│  │  │Gateway   │ │Cert      │ │Kube Prometheus   │  │    │
+│  │  │API       │ │Manager   │ │Stack (Monitoring)│  │    │
 │  │  └──────────┘ └──────────┘ └──────────────────┘  │    │
 │  │  ┌──────────┐ ┌──────────────────────────────┐   │    │
 │  │  │External  │ │CSI Secrets Store (KeyVault)   │   │    │
@@ -49,7 +49,7 @@ This repository provisions a **private, security-hardened AKS cluster** on Azure
 | **Identity** | User-Assigned Managed Identity, Workload Identity, OIDC issuer |
 | **RBAC** | Azure AD RBAC, local accounts disabled |
 | **Secrets** | Azure Key Vault + CSI Secrets Store driver |
-| **Ingress** | NGINX Ingress Controller |
+| **Ingress** | Kubernetes Gateway API + Envoy Gateway ([ingress-nginx retired March 2026](https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/)) |
 | **TLS** | cert-manager (Let's Encrypt ready) |
 | **Monitoring** | kube-prometheus-stack (Prometheus, Grafana, Alertmanager) |
 | **DNS** | External DNS with Azure DNS + Managed Identity |
@@ -75,7 +75,7 @@ This repository provisions a **private, security-hardened AKS cluster** on Azure
 ├── platform/
 │   ├── helm/
 │   │   ├── cert-manager/           # TLS certificate automation
-│   │   ├── ingress-nginx/          # Ingress controller
+│   │   ├── gateway-api/            # Gateway API (Envoy Gateway) — replaces ingress-nginx
 │   │   ├── kube-prometheus-stack/  # Full observability stack
 │   │   ├── external-dns/           # Automatic DNS record management
 │   │   ├── csi-secrets-store/      # Azure Key Vault integration
@@ -221,7 +221,7 @@ An Azure DevOps pipeline (`pipelines/azure-devops/azure-pipelines.yml`) is also 
 - **Security scanning**: tfsec, Checkov
 - **Runtime security**: Falco (eBPF), Microsoft Defender for Containers
 - **Monitoring**: Prometheus, Grafana, Alertmanager (kube-prometheus-stack)
-- **Ingress**: NGINX Ingress Controller
+- **Ingress**: Kubernetes Gateway API + Envoy Gateway (ingress-nginx retired March 2026)
 - **TLS**: cert-manager
 - **DNS**: External DNS
 - **Secrets**: Azure Key Vault + CSI Secrets Store

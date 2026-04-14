@@ -1,0 +1,77 @@
+# Kubernetes Gateway API — replaces ingress-nginx (retired March 2026)
+#
+# The Gateway API is the official successor to the Ingress API, recommended by
+# Kubernetes SIG Network. It provides a more expressive, role-based model for
+# traffic management.
+#
+# Installation:
+#   kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/latest/download/standard-install.yaml
+#
+# Then install a Gateway API-compatible data plane. Options:
+#   - Cilium (if using Cilium CNI)           https://docs.cilium.io/en/stable/network/servicemesh/gateway-api/
+#   - Envoy Gateway (CNCF, recommended)      https://gateway.envoyproxy.io/
+#   - Istio (if using service mesh)          https://istio.io/latest/docs/tasks/traffic-management/ingress/gateway-api/
+#   - Traefik v3                             https://doc.traefik.io/traefik/routing/providers/kubernetes-gateway/
+#   - Kong                                   https://docs.konghq.com/kubernetes-ingress-controller/latest/guides/services/gateway-api/
+#
+# This repo uses Envoy Gateway as the default data plane.
+# Install via Helm:
+#   helm install eg oci://docker.io/envoyproxy/gateway-helm \
+#     --version v1.3.0 \
+#     --namespace envoy-gateway-system \
+#     --create-namespace
+
+# ── GatewayClass ─────────────────────────────────────────────────────────────
+# Defines the controller responsible for provisioning Gateways.
+# Applied as a cluster-scoped resource after the CRDs are installed.
+gatewayClass:
+  name: envoy
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+
+# ── Gateway (shared, cluster-operator-owned) ─────────────────────────────────
+# One Gateway per environment — routes attach to this.
+gateway:
+  name: platform-gateway
+  namespace: envoy-gateway-system
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+    - name: https
+      protocol: HTTPS
+      port: 443
+      # TLS cert managed by cert-manager via annotation on the Gateway
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: platform-tls
+            namespace: envoy-gateway-system
+
+# ── HTTPRoute pattern (reference — applied per workload namespace) ─────────────
+# Teams attach HTTPRoutes to the shared Gateway for their services.
+# Example:
+#   apiVersion: gateway.networking.k8s.io/v1
+#   kind: HTTPRoute
+#   metadata:
+#     name: my-app
+#     namespace: my-app-ns
+#   spec:
+#     parentRefs:
+#       - name: platform-gateway
+#         namespace: envoy-gateway-system
+#     hostnames:
+#       - "my-app.example.com"
+#     rules:
+#       - matches:
+#           - path:
+#               type: PathPrefix
+#               value: /
+#         backendRefs:
+#           - name: my-app-svc
+#             port: 8080
+
+# ── Migration note ────────────────────────────────────────────────────────────
+# ingress-nginx was removed — it was retired by the Kubernetes project in
+# March 2026 (https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/).
+# No new releases, security patches, or bug fixes will be issued after that date.
+# The Gateway API is the recommended migration path per Kubernetes SIG Network.

@@ -2,30 +2,30 @@ project  = "portfolio"
 env      = "dev"
 location = "eastus"
 
-resource_group_name = "rg-portfolio-dev"
-tenant_id           = "b58e8c48-dd94-4e31-9685-e1c0800dee58"
+resource_group_name                    = "rg-portfolio-dev"
+tenant_id                              = "b58e8c48-dd94-4e31-9685-e1c0800dee58"
 keyvault_public_network_access_enabled = true
-keyvault_purge_protection_enabled       = false
-keyvault_soft_delete_retention_days     = 7
-keyvault_enable_network_acls            = false
-keyvault_network_acls_default_action    = "Allow"
-keyvault_network_acls_bypass            = "AzureServices"
+keyvault_purge_protection_enabled      = false
+keyvault_soft_delete_retention_days    = 7
+keyvault_enable_network_acls           = false
+keyvault_network_acls_default_action   = "Allow"
+keyvault_network_acls_bypass           = "AzureServices"
 
 vnet_cidr           = "10.50.0.0/16"
 aks_subnet_cidr     = "10.50.1.0/24"
 bastion_subnet_cidr = "10.50.2.0/27"
 
-kubernetes_version = "1.34.1"
-system_node_count  = 1
-system_vm_size     = "Standard_DC2ds_v3"
-public_network_access_enabled  = false
-local_account_disabled         = false
-azure_policy_enabled           = true
-enable_aad_rbac                = false
-aad_admin_group_object_ids     = []
+kubernetes_version              = "1.34.1"
+system_node_count               = 1
+system_vm_size                  = "Standard_DC2ds_v3"
+public_network_access_enabled   = false
+local_account_disabled          = false
+azure_policy_enabled            = true
+enable_aad_rbac                 = false
+aad_admin_group_object_ids      = []
 api_server_authorized_ip_ranges = []
-outbound_type                  = "loadBalancer"
-load_balancer_sku              = "standard"
+outbound_type                   = "loadBalancer"
+load_balancer_sku               = "standard"
 
 enable_jumpbox  = false
 jumpbox_vm_size = "Standard_DC2ds_v3"
