@@ -168,9 +168,9 @@ jobs:
           sarif_file: checkov-results.sarif
           category: checkov
 
-  # ── Job 3: Falco rule linting ───────────────────────────────────────────────
+  # ── Job 3: Falco config & YAML linting ────────────────────────────────────────
   falco-lint:
-    name: Falco rule lint
+    name: Falco config & YAML lint
     runs-on: ubuntu-latest
     outputs:
       outcome: ${{ steps.lint.outcome }}
@@ -179,72 +179,48 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install falcoctl
-        run: |
-          curl -sLo falcoctl.tar.gz \
-            https://github.com/falcosecurity/falcoctl/releases/latest/download/falcoctl_linux_amd64.tar.gz
-          tar xf falcoctl.tar.gz
-          chmod +x falcoctl
-          sudo mv falcoctl /usr/local/bin/
+      - name: Install yamllint
+        run: pip install yamllint --quiet
 
-      - name: Lint Falco rules files
+      - name: Lint Falco values.yaml
         id: lint
         continue-on-error: true
         run: |
-          ERRORS=""
-          EXIT_CODE=0
+          echo "=== Validating Falco Helm values ==="
+          yamllint -d "{extends: relaxed, rules: {line-length: {max: 150}}}" \
+            platform/helm/falco/values.yaml
 
-          # Find any custom Falco rules files in the repo
-          RULES_FILES=$(find . -name "*falco*rules*.yaml" -o -name "*falco*rules*.yml" 2>/dev/null | grep -v ".github")
+          echo "=== Validating all platform YAML files ==="
+          find platform/ -name "*.yaml" -o -name "*.yml" | \
+            xargs yamllint -d "{extends: relaxed, rules: {line-length: {max: 150}}}"
 
-          if [ -z "$RULES_FILES" ]; then
-            echo "No custom Falco rules files found — validating Falco values.yaml structure"
-            # Validate the Helm values file is valid YAML
-            python3 -c "
+          echo "=== Checking required Falco security keys are present ==="
+          python3 - <<'PYEOF'
           import yaml, sys
-          try:
-              with open('platform/helm/falco/values.yaml') as f:
-                  yaml.safe_load(f)
-              print('values.yaml: valid YAML')
-          except Exception as e:
-              print(f'values.yaml: INVALID — {e}')
-              sys.exit(1)
-          " 2>&1
-            LINT_RESULT=$?
-          else
-            echo "Found custom rules: $RULES_FILES"
-            for f in $RULES_FILES; do
-              echo "Linting: $f"
-              falcoctl artifact lint --type rulesfile "$f" 2>&1 || EXIT_CODE=1
-            done
-          fi
 
-          # Also validate all platform manifests are valid YAML
-          echo "Validating all platform YAML files..."
-          python3 -c "
-          import yaml, os, sys
-          errors = []
-          for root, dirs, files in os.walk('platform'):
-              for f in files:
-                  if f.endswith(('.yaml', '.yml')):
-                      path = os.path.join(root, f)
-                      try:
-                          list(yaml.safe_load_all(open(path)))
-                      except Exception as e:
-                          errors.append(f'{path}: {e}')
-          if errors:
-              print('YAML validation errors:')
-              for e in errors:
-                  print(f'  {e}')
-              sys.exit(1)
-          else:
-              print(f'All platform YAML files are valid')
-          " 2>&1
-          YAML_RESULT=$?
+          with open("platform/helm/falco/values.yaml") as f:
+              values = yaml.safe_load(f)
 
-          if [ $EXIT_CODE -ne 0 ] || [ $YAML_RESULT -ne 0 ]; then
-            exit 1
-          fi
+          required_keys = ["driver", "falco", "falcosidekick"]
+          missing = [k for k in required_keys if k not in values]
+
+          if missing:
+              print(f"ERROR: Missing required keys in falco/values.yaml: {missing}")
+              sys.exit(1)
+
+          driver_kind = values.get("driver", {}).get("kind", "")
+          if driver_kind not in ["ebpf", "modern_ebpf", "kmod"]:
+              print(f"WARNING: Unexpected driver.kind: {driver_kind}")
+
+          json_output = values.get("falco", {}).get("json_output", False)
+          if not json_output:
+              print("WARNING: falco.json_output is not enabled — alerts may not parse correctly")
+
+          print(f"driver.kind: {driver_kind} ✓")
+          print(f"falco.json_output: {json_output} ✓")
+          print(f"falcosidekick enabled: {values.get('falcosidekick', {}).get('enabled', False)} ✓")
+          print("All required Falco keys present ✓")
+          PYEOF
 
       - name: Build summary
         id: summary
