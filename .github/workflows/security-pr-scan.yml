@@ -75,7 +75,7 @@ jobs:
           echo "$TEXT" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Upload tfsec SARIF
+      - name: Generate tfsec SARIF
         if: always()
         uses: aquasecurity/tfsec-action@v1.0.3
         continue-on-error: true
@@ -85,8 +85,8 @@ jobs:
           format: sarif
           additional_args: --minimum-severity HIGH --out tfsec-results.sarif
 
-      - name: Upload SARIF to GitHub Security
-        if: always()
+      - name: Upload tfsec SARIF to GitHub Security
+        if: always() && hashFiles('tfsec-results.sarif') != ''
         uses: github/codeql-action/upload-sarif@v3
         continue-on-error: true
         with:
@@ -148,7 +148,7 @@ jobs:
           echo "$TEXT" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Upload Checkov SARIF
+      - name: Generate Checkov SARIF
         if: always()
         uses: bridgecrewio/checkov-action@v12
         continue-on-error: true
@@ -160,8 +160,8 @@ jobs:
           soft_fail: true
           skip_check: CKV_AZURE_141,CKV2_AZURE_2
 
-      - name: Upload SARIF to GitHub Security
-        if: always()
+      - name: Upload Checkov SARIF to GitHub Security
+        if: always() && hashFiles('checkov-results.sarif') != ''
         uses: github/codeql-action/upload-sarif@v3
         continue-on-error: true
         with:
