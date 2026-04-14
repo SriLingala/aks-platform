@@ -6,7 +6,6 @@
 [![tfsec](https://img.shields.io/badge/tfsec-enabled-5C4EE5?logo=terraform&logoColor=white)](https://github.com/SriLingala/aks-platform/actions/workflows/security-pr-scan.yml)
 [![Checkov](https://img.shields.io/badge/checkov-enabled-4CAF50?logo=paloaltonetworks&logoColor=white)](https://github.com/SriLingala/aks-platform/actions/workflows/security-pr-scan.yml)
 [![Falco](https://img.shields.io/badge/falco-runtime%20security-00ADEF?logoColor=white)](https://github.com/SriLingala/aks-platform/actions/workflows/security-pr-scan.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ## Overview
 
