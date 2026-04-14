@@ -7,9 +7,16 @@ variable "kubernetes_version" { type = string }
 variable "system_node_count" { type = number }
 variable "system_vm_size" { type = string }
 
+variable "enable_defender" {
+  description = "Enable Microsoft Defender for Containers. Requires log_analytics_workspace_id."
+  type        = bool
+  default     = false
+}
+
 variable "log_analytics_workspace_id" {
-  description = "Log Analytics workspace ID for Microsoft Defender for Containers"
+  description = "Log Analytics workspace ID for Microsoft Defender for Containers. Required when enable_defender = true."
   type        = string
+  default     = ""
 }
 
 variable "public_network_access_enabled" {
