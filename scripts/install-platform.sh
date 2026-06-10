@@ -21,7 +21,6 @@ cleanup() { rm -rf "$TMP_DIR"; }
 trap cleanup EXIT
 
 helm repo add jetstack https://charts.jetstack.io >/dev/null
-helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx >/dev/null
 helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/ >/dev/null
 helm repo update >/dev/null
 
@@ -61,11 +60,22 @@ apply_manifest \
   "$ROOT_DIR/platform/helm/cert-manager/values.yaml" \
   --set installCRDs=true
 
-apply_manifest \
-  "ingress-nginx" \
-  "ingress-nginx/ingress-nginx" \
-  "ingress-nginx" \
-  "$ROOT_DIR/platform/helm/ingress-nginx/values.yaml"
+# Gateway API CRDs + Envoy Gateway as the data plane
+# (ingress-nginx was retired by the Kubernetes project in March 2026)
+aks_kubectl "kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.1/standard-install.yaml"
+
+ENVOY_GATEWAY_VERSION="${ENVOY_GATEWAY_VERSION:-v1.3.0}"
+envoy_manifest="$TMP_DIR/envoy-gateway.yaml"
+helm template eg oci://docker.io/envoyproxy/gateway-helm \
+  --version "$ENVOY_GATEWAY_VERSION" \
+  --namespace envoy-gateway-system > "$envoy_manifest"
+
+aks_kubectl "kubectl get ns envoy-gateway-system >/dev/null 2>&1 || kubectl create ns envoy-gateway-system"
+az aks command invoke \
+  --resource-group "$AKS_RESOURCE_GROUP" \
+  --name "$AKS_NAME" \
+  --command "kubectl apply -f envoy-gateway.yaml" \
+  --file "$envoy_manifest" >/dev/null
 
 if [[ "${ENABLE_EXTERNAL_DNS:-false}" == "true" ]]; then
   if [[ -z "${EXTERNAL_DNS_RESOURCE_GROUP:-}" || -z "${EXTERNAL_DNS_SUBSCRIPTION_ID:-}" || -z "${EXTERNAL_DNS_TENANT_ID:-}" || -z "${EXTERNAL_DNS_DOMAIN_FILTERS:-}" ]]; then

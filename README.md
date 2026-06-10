@@ -14,75 +14,50 @@ This repository provisions a **private, security-hardened AKS cluster** on Azure
 ## Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│                           Azure Subscription / Virtual Network                    │
-│                                                                                    │
-│  ┌──────────────────┐   ┌──────────────────┐   ┌──────────────────┐              │
-│  │      VNet         │   │    Key Vault      │   │  User-Assigned   │              │
-│  │  ├─ AKS Subnet   │   │  (CSI-backed)     │   │  Managed Identity│              │
-│  │  ├─ Bastion Subnet│   │  Purge protection │   │  Workload ID     │              │
-│  │  └─ (NSGs)        │   │  Soft-delete 90d  │   │  OIDC Issuer     │              │
-│  └──────────────────┘   └──────────────────┘   └──────────────────┘              │
-│                                                                                    │
-│  ┌──────────────────────────────────────────────────────────────────────────┐     │
-│  │                     Private AKS Cluster  (API server: no public endpoint) │     │
-│  │                                                                            │     │
-│  │  ── Node Pools ─────────────────────────────────────────────────────────  │     │
-│  │  ┌───────────────┐  ┌───────────────┐  ┌───────────────────────────────┐ │     │
-│  │  │  System Pool  │  │   User Pool   │  │         Spot Pool             │ │     │
-│  │  │  AzureLinux   │  │  Workloads    │  │  Batch / dev / cost-optimised │ │     │
-│  │  │  critical only│  │               │  │                               │ │     │
-│  │  └───────────────┘  └───────────────┘  └───────────────────────────────┘ │     │
-│  │                                                                            │     │
-│  │  ── Networking ──────────────────────────────────────────────────────────  │     │
-│  │  ┌─────────────────────────┐  ┌───────────────────┐  ┌─────────────────┐ │     │
-│  │  │  Gateway API            │  │  Azure CNI        │  │  External DNS   │ │     │
-│  │  │  + Envoy Gateway        │  │  Network Policies │  │  → Azure DNS    │ │     │
-│  │  │  (ingress-nginx retired │  │  deny-all default │  │                 │ │     │
-│  │  │   March 2026)           │  │  7 selective allows│  │                 │ │     │
-│  │  └─────────────────────────┘  └───────────────────┘  └─────────────────┘ │     │
-│  │                                                                            │     │
-│  │  ── Platform Services ───────────────────────────────────────────────────  │     │
-│  │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────────────┐ │     │
-│  │  │  cert-manager    │  │  kube-prometheus  │  │  CSI Secrets Store       │ │     │
-│  │  │  TLS automation  │  │  stack            │  │  + Azure Key Vault       │ │     │
-│  │  │  (Let's Encrypt) │  │  Prometheus       │  │  Zero-secret pods        │ │     │
-│  │  │                  │  │  Grafana          │  │                          │ │     │
-│  │  │                  │  │  Alertmanager     │  │                          │ │     │
-│  │  └──────────────────┘  └──────────────────┘  └──────────────────────────┘ │     │
-│  │                                                                            │     │
-│  │  ── Security ────────────────────────────────────────────────────────────  │     │
-│  │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────────────┐ │     │
-│  │  │  Falco (eBPF)    │  │  RBAC            │  │  Pod Security Standards  │ │     │
-│  │  │  Runtime threat  │  │  ClusterRoles    │  │  Restricted  (app NS)    │ │     │
-│  │  │  detection       │  │  Least privilege │  │  Baseline    (platform)  │ │     │
-│  │  │  Falcosidekick   │  │  AAD RBAC opt.   │  │  Privileged  (system)    │ │     │
-│  │  │  → Azure Monitor │  │  Local accts OFF │  │                          │ │     │
-│  │  └──────────────────┘  └──────────────────┘  └──────────────────────────┘ │     │
-│  │                                                                            │     │
-│  │  ── Environments ────────────────────────────────────────────────────────  │     │
-│  │   dev  ──────────────────  staging  ─────────────────  prod               │     │
-│  │   (Terraform workspace)    (Terraform workspace)       (Terraform workspace│     │
-│  │                             Remote state: Azure Blob Storage               │     │
-│  └──────────────────────────────────────────────────────────────────────────┘     │
-│                                                                                    │
-│  ┌──────────────────────────────────────────────────────────────────────────┐     │
-│  │                        CI / CD & Shift-Left Security                      │     │
-│  │                                                                            │     │
-│  │  GitHub Actions                         Azure DevOps (ADO)                │     │
-│  │  ├─ terraform-validate  (fmt + init + validate + kubeconform)             │     │
-│  │  ├─ security-pr-scan    (tfsec + Checkov + Falco lint → PR comment)       │     │
-│  │  ├─ terraform-plan      (plan diff comment on PR)                         │     │
-│  │  ├─ terraform-apply     (apply on merge to main)                          │     │
-│  │  └─ terraform-destroy   (manual teardown)                                 │     │
-│  │                                                                            │     │
-│  │  Security findings → SARIF → GitHub Security tab                          │     │
-│  └──────────────────────────────────────────────────────────────────────────┘     │
-│                                                                                    │
-│  ┌──────────────────┐  (optional)                                                 │
-│  │   Jumpbox VM      │  Private access to AKS API via Azure Bastion               │
-│  └──────────────────┘                                                              │
-└──────────────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│                  Azure Subscription / Virtual Network                  │
+│                                                                        │
+│  ┌────────────────┐  ┌──────────────────┐  ┌────────────────────────┐  │
+│  │  VNet          │  │  Key Vault       │  │  User-Assigned         │  │
+│  │  ├ AKS subnet  │  │  Purge protection│  │  Managed Identity      │  │
+│  │  ├ Bastion sub │  │  Soft-delete 90d │  │  Workload ID           │  │
+│  │  └ NSGs        │  │  Network ACLs    │  │  OIDC issuer           │  │
+│  └────────────────┘  └──────────────────┘  └────────────────────────┘  │
+│                                                                        │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │        Private AKS cluster (API server: no public endpoint)      │  │
+│  │                                                                  │  │
+│  │  Node pools     System (AzureLinux, critical only) · User        │  │
+│  │                                                                  │  │
+│  │  Networking     Gateway API + Envoy Gateway (ingress-nginx       │  │
+│  │                 retired Mar 2026) · Azure CNI · Network Policies │  │
+│  │                 default deny · External DNS → Azure DNS          │  │
+│  │                                                                  │  │
+│  │  Platform       cert-manager (TLS) · Falco (eBPF runtime         │  │
+│  │                 security)                                        │  │
+│  │                                                                  │  │
+│  │  Security       RBAC least privilege · Pod Security Standards    │  │
+│  │                 (restricted app NS / baseline platform NS) ·     │  │
+│  │                 AAD RBAC · local accounts disabled ·             │  │
+│  │                 Defender for Containers (optional toggle)        │  │
+│  │                                                                  │  │
+│  │  Environment    dev (remote state: Azure Blob Storage)           │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+│                                                                        │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │  CI/CD (GitHub Actions)                                          │  │
+│  │  ├ terraform-validate   PR: fmt + init + validate + kubeconform  │  │
+│  │  ├ security-pr-scan     PR: tfsec + Checkov + Falco lint         │  │
+│  │  ├ terraform-plan       manual (needs live Azure subscription)   │  │
+│  │  ├ terraform-apply      manual (needs live Azure subscription)   │  │
+│  │  └ terraform-destroy    manual teardown                          │  │
+│  │  Security findings → SARIF → GitHub Security tab                 │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+│                                                                        │
+│  ┌────────────────┐  (optional)                                       │
+│  │  Jumpbox VM    │  Private access to AKS API via Azure Bastion      │
+│  └────────────────┘                                                   │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Key Features
@@ -92,13 +67,12 @@ This repository provisions a **private, security-hardened AKS cluster** on Azure
 | **Cluster** | Private AKS, Azure CNI, Azure network policy, AzureLinux OS |
 | **Identity** | User-Assigned Managed Identity, Workload Identity, OIDC issuer |
 | **RBAC** | Azure AD RBAC, local accounts disabled |
-| **Secrets** | Azure Key Vault + CSI Secrets Store driver |
+| **Secrets** | Azure Key Vault (RBAC authorisation, network ACLs, purge protection) |
 | **Ingress** | Kubernetes Gateway API + Envoy Gateway ([ingress-nginx retired March 2026](https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/)) |
 | **TLS** | cert-manager (Let's Encrypt ready) |
-| **Monitoring** | kube-prometheus-stack (Prometheus, Grafana, Alertmanager) |
 | **DNS** | External DNS with Azure DNS + Managed Identity |
-| **Runtime Security** | Microsoft Defender for Containers + Falco (eBPF) |
-| **CI/CD** | GitHub Actions (validate, plan, apply, destroy, security scan) + Azure DevOps |
+| **Runtime Security** | Falco (eBPF); Microsoft Defender for Containers via opt-in toggle |
+| **CI/CD** | GitHub Actions (validate + security scan on PR; plan/apply/destroy manual) |
 
 ## Repository Structure
 
@@ -114,38 +88,28 @@ This repository provisions a **private, security-hardened AKS cluster** on Azure
 │   │   └── bootstrap/        # Remote state backend (Storage Account)
 │   └── environments/
 │       ├── bootstrap/        # State storage provisioning
-│       ├── dev/              # Development environment
-│       └── prod/             # Production environment
+│       └── dev/              # Development environment
 ├── platform/
 │   ├── helm/
 │   │   ├── cert-manager/           # TLS certificate automation
 │   │   ├── gateway-api/            # Gateway API (Envoy Gateway) — replaces ingress-nginx
-│   │   ├── kube-prometheus-stack/  # Full observability stack
 │   │   ├── external-dns/           # Automatic DNS record management
-│   │   ├── csi-secrets-store/      # Azure Key Vault integration
 │   │   └── falco/                  # Runtime threat detection (eBPF)
 │   └── manifests/
-│       ├── baseline/               # Namespaces (PSS labels), network policies, RBAC
-│       ├── keyvault-csi-demo/      # Secrets Store CSI demo
-│       └── workload-identity-demo/ # Workload Identity demo
+│       └── baseline/               # Namespaces (PSS labels), network policies, RBAC
 ├── scripts/
 │   ├── install-platform.sh         # Automated platform add-on installer
 │   └── reconcile-dev.sh            # Dev environment reconciliation
-├── pipelines/
-│   └── azure-devops/               # Azure DevOps pipeline definition
 ├── .github/workflows/
 │   ├── security-pr-scan.yml        # tfsec + Checkov + Falco lint on every PR
 │   ├── terraform-validate.yml      # Format check + validate + kubeconform
-│   ├── terraform-plan.yml          # Plan with diff comment
-│   ├── terraform-apply.yml         # Apply on merge to main
+│   ├── terraform-plan.yml          # Plan (manual)
+│   ├── terraform-apply.yml         # Apply (manual)
 │   ├── terraform-bootstrap.yml     # Bootstrap remote state
 │   ├── terraform-destroy.yml       # Tear down environment
 │   └── terraform-destroy-bootstrap.yml
 └── docs/
-    ├── architecture.md
-    ├── decisions.md
     ├── security-notes.md           # Full security architecture and control reference
-    ├── cost-notes.md
     └── runbook.md
 ```
 
@@ -223,7 +187,7 @@ SARIF results are also uploaded to the **[Security tab](https://github.com/SriLi
 ### Security architecture (5 layers)
 
 ```
-Layer 5 — Runtime          Falco (eBPF) + Microsoft Defender for Containers
+Layer 5 — Runtime          Falco (eBPF); Microsoft Defender for Containers (opt-in)
 Layer 4 — Workload         Pod Security Standards (enforce: restricted on app namespaces)
                            Kubernetes RBAC (platform-viewer / app-developer / namespace-admin)
                            Workload Identity — no secrets stored in pods
@@ -249,25 +213,22 @@ GitHub Actions workflows handle the full lifecycle:
 |----------|---------|--------|
 | `security-pr-scan` | **Every PR** | tfsec + Checkov + Falco lint → PR comment |
 | `terraform-validate` | PR | Format check + validate + kubeconform |
-| `terraform-plan` | PR | Terraform plan with diff comment |
-| `terraform-apply` | Merge to main | Apply changes |
+| `terraform-plan` | Manual | Terraform plan (needs a live Azure subscription via repo secrets) |
+| `terraform-apply` | Manual | Apply changes (needs a live Azure subscription via repo secrets) |
 | `terraform-destroy` | Manual | Tear down environment |
 | `terraform-bootstrap` | Manual | Provision remote state backend |
-
-An Azure DevOps pipeline (`pipelines/azure-devops/azure-pipelines.yml`) is also provided for teams using ADO.
 
 ## Tech Stack
 
 - **Cloud**: Microsoft Azure
 - **IaC**: Terraform (modular, multi-environment)
 - **Container Orchestration**: Azure Kubernetes Service (AKS)
-- **CI/CD**: GitHub Actions, Azure DevOps
+- **CI/CD**: GitHub Actions
 - **Security scanning**: tfsec, Checkov
-- **Runtime security**: Falco (eBPF), Microsoft Defender for Containers
-- **Monitoring**: Prometheus, Grafana, Alertmanager (kube-prometheus-stack)
+- **Runtime security**: Falco (eBPF); Microsoft Defender for Containers (opt-in)
 - **Ingress**: Kubernetes Gateway API + Envoy Gateway (ingress-nginx retired March 2026)
 - **TLS**: cert-manager
 - **DNS**: External DNS
-- **Secrets**: Azure Key Vault + CSI Secrets Store
+- **Secrets**: Azure Key Vault
 - **Identity**: Azure AD, Workload Identity, Managed Identity
 - **Scripting**: Bash

@@ -1,11 +1,9 @@
 name: terraform-apply
 
+# Applies the dev environment. Manual trigger only - requires a live Azure
+# subscription wired up via the ARM_* and TF_BACKEND_* repository secrets.
 on:
   workflow_dispatch:
-  workflow_run:
-    workflows: ["terraform-validate"]
-    types:
-      - completed
 
 permissions:
   contents: read
@@ -64,12 +62,6 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     concurrency: terraform-apply-dev
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'push' &&
-       github.event.workflow_run.head_branch == 'main' &&
-       github.event.workflow_run.head_repository.fork == false)
     env:
       TF_IN_AUTOMATION: 1
       ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}

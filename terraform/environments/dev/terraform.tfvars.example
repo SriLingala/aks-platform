@@ -1,0 +1,42 @@
+project  = "portfolio"
+env      = "dev"
+location = "uksouth"
+
+resource_group_name = "rg-portfolio-dev"
+
+# Your Azure AD tenant ID: az account show --query tenantId -o tsv
+tenant_id = "00000000-0000-0000-0000-000000000000"
+
+keyvault_public_network_access_enabled = false
+keyvault_purge_protection_enabled      = true
+keyvault_soft_delete_retention_days    = 90
+keyvault_enable_network_acls           = true
+keyvault_network_acls_default_action   = "Deny"
+keyvault_network_acls_bypass           = "AzureServices"
+
+vnet_cidr           = "10.50.0.0/16"
+aks_subnet_cidr     = "10.50.1.0/24"
+bastion_subnet_cidr = "10.50.2.0/27"
+
+kubernetes_version              = "1.34.1"
+system_node_count               = 1
+system_vm_size                  = "Standard_D2ds_v5"
+public_network_access_enabled   = false
+local_account_disabled          = true
+azure_policy_enabled            = true
+enable_aad_rbac                 = true
+aad_admin_group_object_ids      = [] # object IDs of the AAD groups granted cluster-admin
+api_server_authorized_ip_ranges = []
+outbound_type                   = "loadBalancer"
+load_balancer_sku               = "standard"
+
+enable_jumpbox  = false
+jumpbox_vm_size = "Standard_D2ds_v5"
+
+jumpbox_admin_username = "azureuser"
+# Generate a dedicated key pair: ssh-keygen -t ed25519 -f ~/.ssh/aks-jumpbox
+jumpbox_ssh_public_key = "ssh-ed25519 AAAA...replace-with-your-public-key"
+
+tags = {
+  owner = "sri"
+}

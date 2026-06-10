@@ -1,0 +1,23 @@
+# external-dns — manages Azure DNS records for Gateway/Service resources.
+# Azure provider settings (subscription, resource group, identity) are passed
+# per environment via --set flags in scripts/install-platform.sh.
+
+policy: sync
+interval: 5m
+
+sources:
+  - service
+  - gateway-httproute
+
+logLevel: info
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 64Mi
+  limits:
+    memory: 128Mi
+
+securityContext:
+  runAsNonRoot: true
+  readOnlyRootFilesystem: true
